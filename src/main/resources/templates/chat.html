@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Tiwlink : Real-Time Chat Application</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <style>
+
+        .chat-message{
+        max-width:70%;
+        padding:10px 15px;
+        border-radius:15px;
+        margin-bottom:10px;
+        word-wrap:break-word;
+        }
+
+        .sent{
+        background:#0d6efd;
+        color:white;
+        border-radius:15px;
+        padding:6px 8px;
+        align-self:flex-end;
+        max-width:70%;
+        margin-bottom:10px;
+        }
+
+        .received{
+        background:#2b3035;
+        color:white;
+        border-radius:15px;
+        padding:6px 8px;
+        align-self:flex-start;
+        max-width:70%;
+        margin-bottom:10px;
+        }
+
+        .sender-name{
+        font-size:10px;
+        opacity:0.7;
+        margin-bottom:3px;
+        }
+
+
+        #chat{
+        background:#1e1f22;
+        border-radius:10px;
+        scroll-behavior:smooth;
+        }
+
+
+        #typingIndicator{
+        height:20px;
+        font-style:italic;
+        opacity:0.7;
+        margin-bottom:10px;
+        }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.1/stomp.min.js"></script>
+</head>
+<body>
+<div class="container mt-4">
+    <h1 class="text-center">Tiwlink - Real-Time Chat Application</h1>
+    <div id="chat"
+         class="border rounded p-3 mb-3 d-flex flex-column"
+         style="height:300px; overflow-y: auto;">
+    </div>
+    <div id="typingIndicator" class="text-muted small"></div>
+    <div class="input-group mb-3">
+        <input id="senderInput" type="text" class="form-control"
+               placeholder="Your name...."/>
+    </div>
+
+
+    <div class="input-group mb-3">
+        <input id="messageInput" type="text" class="form-control"
+               placeholder="Type a message...."/>
+        <div id="input-group-append">
+            <button id="sendMessage" class="btn btn-primary">Send</button>
+        </div>
+    </div>
+</div>
+</body>
+<script>
+
+
+    function setConnected(connected){
+    document.getElementById('sendMessage').disabled = !connected;
+    }
+    function connect(){
+        var socket = new SockJS('/chat');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+             setConnected(true);
+             stompClient.subscribe('/topic/messages', function (message){
+             showMessage(JSON.parse(message.body));
+             });
+           stompClient.subscribe('/topic/typing', function(message){
+           var user = message.body;
+           var currentUser = document.getElementById("senderInput").value;
+           if(user !== currentUser){
+           document.getElementById("typingIndicator").textContent = user + " is typing...";
+           }
+           setTimeout(function(){
+           document.getElementById("typingIndicator").textContent = "";
+           },1000);
+
+           });
+        });
+        }
+        function showMessage(message) {
+        var chat = document.getElementById('chat');
+        var currentUser = document.getElementById('senderInput').value;
+
+        var messageElement = document.createElement('div');
+
+        var sender = document.createElement('div');
+        sender.textContent = message.sender;
+        sender.className = "sender-name";
+
+        var text = document.createElement('div');
+        text.textContent = message.content;
+
+        messageElement.appendChild(sender);
+        messageElement.appendChild(text);
+
+        if(message.sender === currentUser){
+        messageElement.className = "chat-message sent";
+        }else{
+        messageElement.className = "chat-message received";
+        }
+
+        chat.appendChild(messageElement);
+        chat.scrollTop = chat.scrollHeight;
+        }
+
+
+        function sendMessage(){
+        var sender = document.getElementById('senderInput').value;
+        var content = document.getElementById('messageInput').value;
+        var ChatMessage = {
+            sender: sender,
+            content: content
+        }
+        stompClient.send("/app/sendMessage", {}, JSON.stringify(ChatMessage));
+        document.getElementById('messageInput').value = '';
+        }
+
+
+       var typingTimer;
+       document.getElementById("messageInput").addEventListener("input", function(){
+       clearTimeout(typingTimer);
+       var sender = document.getElementById("senderInput").value;
+       if(sender.trim() !== ""){
+       stompClient.send("/app/typing", {}, sender);
+       }
+       typingTimer = setTimeout(function(){
+       document.getElementById("typingIndicator").textContent = "";
+       },1000);
+       });
+
+       document.getElementById("messageInput").addEventListener("keypress", function(e){
+       if(e.key === "Enter"){
+       sendMessage();
+       }
+       });
+       document.getElementById('sendMessage').onclick = sendMessage;
+       window.onload = connect;
+</script>
+</html>
