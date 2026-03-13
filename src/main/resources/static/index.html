@@ -90,9 +90,7 @@
     document.getElementById('sendMessage').disabled = !connected;
     }
     function connect(){
-       var socket = new WebSocket("wss://" + window.location.host + "/chat");
-       stompClient = Stomp.over(socket);
-        stompClient = Stomp.over(socket);
+        var socket = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/chat");       stompClient = Stomp.over(socket);
         stompClient.connect({}, function (frame) {
              setConnected(true);
              stompClient.subscribe('/topic/messages', function (message){
